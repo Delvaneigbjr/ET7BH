@@ -8,7 +8,7 @@ static void INICIALIZACAO(void);
 static void PWM_TRIP(void);
 
 
-int read=0,i=0, j=0, state=0,flag_start=0;
+int read=0,i=0, j=0,a=0, state=0,flag_start=0;
 float read_f=0,vetv[]={0,0,0,0,0,0};
 
 int main(void)
