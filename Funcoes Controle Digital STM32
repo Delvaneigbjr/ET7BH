@@ -1,0 +1,148 @@
+/**************Inicialização do conversor, em malha aberta*******************/
+
+/* Private function prototypes -----------------------------------------------*/
+
+static void RAMPA_SUBIDA(void);
+static void RAMPA_DESCIDA(void);
+static void INICIALIZACAO(void);
+static void PWM_TRIP(void);
+
+
+int read=0,i=0, j=0, state=0,flag_start=0;
+float read_f=0,vetv[]={0,0,0,0,0,0};
+
+int main(void)
+{
+
+  MX_GPIO_Init();
+  MX_ADC1_Init();
+  MX_TIM3_Init();
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+  /* USER CODE BEGIN 2 */
+
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+ 
+
+  while (1)
+  {
+    
+   switch(state)
+  	{
+	    case 0:
+	    {
+    		 /*enquanto não setar o flag start, a operação nao inicia*/
+         if(flag_start==1)
+          INICIALIZACAO();
+    		break;
+	    }
+	    case 1:
+	    {
+    		/*a rampa de subida é controlada pela variavel j, que é o delay entre cada incremento
+        da razão cíclica*/
+
+        RAMPA_SUBIDA();
+        break;
+	    }
+	    case 2:
+	    {    
+    		/*aqui é operação em malha aberta, então é só ajustar a razão cíclica, neste caso
+        a conversão do ADC é utilizada para mudar ela, ou seja, o potenciômetro ajusta seu valor*/
+
+        
+        htim3.Instance->CCR1 = (htim3.Instance->ARR*(read))/100;
+        break;
+	    }
+	    case 3:
+	    {    
+    		RAMPA_DESCIDA();
+    		break;
+	    }
+	    case 4:
+	    {	 
+    		PWM_TRIP();
+    		break;
+	    } 
+    }
+        
+    
+    read_f =0; // variável float
+    for (i = 1; i <= 6; i++)
+       {
+          HAL_ADC_Start(&hadc1);
+          HAL_ADC_PollForConversion(&hadc1,100);
+          read = HAL_ADC_GetValue(&hadc1);
+          read_f = (float)(read*3.3)/4095 +read_f;
+          vetv[i]=read_f;  // vetor tem que ser float também!
+       }
+    read_f = read_f/6;
+    read=(int)100*(read_f/3.3);
+    //HAL_Delay(1000);
+
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+  }
+  /* USER CODE END 3 */
+}
+
+
+
+ /* rotina de interrupção do contador */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
+{
+    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+	
+	/* teste para saber se entrou aqui.. */
+     i++;
+    if(i==100000)
+    i=0;
+}
+
+ void RAMPA_SUBIDA(void)
+
+ { 
+    for(i=0;i<100;i++)
+    {
+      htim3.Instance->CCR1 = (htim3.Instance->ARR*i)/100;
+      HAL_Delay(j);
+      flag_start=0;
+    }  
+    state = 2;
+ }
+
+  void RAMPA_DESCIDA(void)
+ { 
+     for(i=100;i>0;i--)
+     {
+      htim3.Instance->CCR1 = (htim3.Instance->ARR*i)/100;
+      HAL_Delay(j);     
+     }
+     state = 0;
+     flag_start=0;
+ }
+
+   void PWM_TRIP(void)
+
+ {
+   htim3.Instance->CCR1 = 0;
+   state = 0;
+   flag_start=0;
+ }
+
+    void INICIALIZACAO(void)
+
+ {
+   read=0;
+   i=0;
+   j=200;
+   read_f=0;
+   for(i=0;i<6;i++)
+   {
+     vetv[i]=0;
+   }
+    htim3.Instance->CCR1 = (htim3.Instance->ARR*(0))/100;
+    state = 1;  
+ }
