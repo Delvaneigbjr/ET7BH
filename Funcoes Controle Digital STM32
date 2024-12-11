@@ -17,7 +17,8 @@ int main(void)
   MX_GPIO_Init();
   MX_ADC1_Init();
   MX_TIM3_Init();
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_1);
+  HAL_TIM_Base_Start_IT(&htim3);
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -33,16 +34,18 @@ int main(void)
   	{
 	    case 0:
 	    {
-    		 /*enquanto não setar o flag start, a operação nao inicia*/
+    		 HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12, GPIO_PIN_RESET);
+         /*enquanto não setar o flag start, a operação nao inicia*/
          if(flag_start==1)
           INICIALIZACAO();
+     
     		break;
 	    }
 	    case 1:
 	    {
     		/*a rampa de subida é controlada pela variavel j, que é o delay entre cada incremento
         da razão cíclica*/
-
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, 1);
         RAMPA_SUBIDA();
         break;
 	    }
@@ -51,18 +54,21 @@ int main(void)
     		/*aqui é operação em malha aberta, então é só ajustar a razão cíclica, neste caso
         a conversão do ADC é utilizada para mudar ela, ou seja, o potenciômetro ajusta seu valor*/
 
-        
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, 1);
         htim3.Instance->CCR1 = (htim3.Instance->ARR*(read))/100;
         break;
 	    }
 	    case 3:
 	    {    
-    		RAMPA_DESCIDA();
+    		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, 1);
+        RAMPA_DESCIDA();        
     		break;
 	    }
 	    case 4:
 	    {	 
-    		PWM_TRIP();
+    		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, 1);
+        PWM_TRIP();
+   
     		break;
 	    } 
     }
@@ -88,17 +94,28 @@ int main(void)
   /* USER CODE END 3 */
 }
 
+/* rotina de interrupção do módulo PWM, na borda de descida do pulso */
+void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim3)
+{
 
+  i++;
+  i--;
+
+}
 
  /* rotina de interrupção do contador */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim3)
 {
-    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+    
 	
 	/* teste para saber se entrou aqui.. */
-     i++;
-    if(i==100000)
-    i=0;
+     a++;
+    if(a>1000)
+    {
+      HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+      a=0;
+    }
+   
 }
 
  void RAMPA_SUBIDA(void)
