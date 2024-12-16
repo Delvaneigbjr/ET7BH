@@ -1,3 +1,18 @@
+/*ajustar a razão cíclica através do potenciometro*/
+
+int read=0, read_pwm_int=0;
+float read_f=0, read_pwm=0;
+
+HAL_ADC_Start(&hadc1);
+HAL_ADC_PollForConversion(&hadc1,100);
+read = HAL_ADC_GetValue(&hadc1);
+read_f = (float)(read*3.3)/4095;
+read_pwm=(float)(read*1830)/4095; // aqui se errar a ordem do parentesis, ele gera erro e exceção, divisão por 0..
+read_pwm_int = (int)read_pwm;
+htim3.Instance->CCR1 = read_pwm_int;
+
+
+
 /**************Inicialização do conversor, em malha aberta*******************/
 
 /* Private function prototypes -----------------------------------------------*/
