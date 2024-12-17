@@ -178,3 +178,31 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim3)
     htim3.Instance->CCR1 = (htim3.Instance->ARR*(0))/100;
     state = 1;  
  }
+
+ /*Modulador PWM com quatro canais, dois complementares entre sí, utilizando o módulo avançado de temporizador*/
+
+
+ HAL_TIM_PWM_Start_IT(&htim1, TIM_CHANNEL_1);
+ HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_1);
+
+ HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+ HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_3);
+
+ int read=0, read_pwm_int=0;
+ float read_f=0, read_pwm=0;
+
+  while (1)
+  {
+	
+
+ HAL_ADC_Start(&hadc1);
+ HAL_ADC_PollForConversion(&hadc1,100);
+ read = HAL_ADC_GetValue(&hadc1);
+ read_f = (float)(read*3.3)/4095;
+ read_pwm=(float)(read*1830)/4095;
+ read_pwm_int = (int)read_pwm;
+ htim1.Instance->CCR1 = read_pwm_int;
+ htim1.Instance->CCR3 = read_pwm_int;
+
+   }
+
