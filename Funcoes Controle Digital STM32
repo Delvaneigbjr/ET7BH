@@ -1,3 +1,14 @@
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+#define K_ad    0.218
+#define K_filter 1
+#define B2_k 1
+#define B1_k 1
+#define B0_k 1
+#define A1_k 1
+#define A0_k 1
+/* USER CODE END PD */
+
 /*ajustar a razão cíclica através do potenciometro*/
 
 int read=0, read_pwm_int=0;
@@ -15,106 +26,128 @@ htim3.Instance->CCR1 = read_pwm_int;
 
 /**************Inicialização do conversor, em malha aberta*******************/
 
-/* Private function prototypes -----------------------------------------------*/
-
+/* USER CODE BEGIN PFP */
 static void RAMPA_SUBIDA(void);
 static void RAMPA_DESCIDA(void);
 static void INICIALIZACAO(void);
 static void PWM_TRIP(void);
+static void MALHA_ABERTA(void);
+static void MALHA_FECHADA(void);
 
 
-int read=0,i=0, j=0,a=0, state=0,flag_start=0;
-float read_f=0,vetv[]={0,0,0,0,0,0};
+int read=0,i=0, j=0,a=0, state=0,flag_start=0, flag_mf=0;
+float read_f=0,read_pwm=0,vetv[]={0,0,0,0,0,0};
+float y_k=0,e_k=0,uk1=0,uk2=0,yk1=0,yk2=0;
+float V_o=0,v_ref=0;
+/* USER CODE END PFP */
 
 int main(void)
 {
 
-  MX_GPIO_Init();
-  MX_ADC1_Init();
-  MX_TIM3_Init();
-  HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_1);
-  HAL_TIM_Base_Start_IT(&htim3);
-  /* USER CODE BEGIN 2 */
-
-  /* USER CODE END 2 */
+/* USER CODE BEGIN 2 */
+	MX_GPIO_Init();
+	MX_ADC1_Init();
+	MX_TIM3_Init();
+	HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_1);
+  //HAL_TIM_Base_Start_IT(&htim3);
+	/* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
  
 
-  while (1)
-  {
-    
-   switch(state)
-  	{
-	    case 0:
-	    {
-    		 HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12, GPIO_PIN_RESET);
-         /*enquanto não setar o flag start, a operação nao inicia*/
-         if(flag_start==1)
-          INICIALIZACAO();
-     
-    		break;
-	    }
-	    case 1:
-	    {
-    		/*a rampa de subida é controlada pela variavel j, que é o delay entre cada incremento
-        da razão cíclica*/
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, 1);
-        RAMPA_SUBIDA();
-        break;
-	    }
-	    case 2:
-	    {    
-    		/*aqui é operação em malha aberta, então é só ajustar a razão cíclica, neste caso
-        a conversão do ADC é utilizada para mudar ela, ou seja, o potenciômetro ajusta seu valor*/
+/* Infinite loop */
+	/* USER CODE BEGIN WHILE */
+	while (1)
+	{
+		/* USER CODE BEGIN 3 */
 
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, 1);
-        htim3.Instance->CCR1 = (htim3.Instance->ARR*(read))/100;
-        break;
-	    }
-	    case 3:
-	    {    
-    		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, 1);
-        RAMPA_DESCIDA();        
-    		break;
-	    }
-	    case 4:
-	    {	 
-    		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, 1);
-        PWM_TRIP();
-   
-    		break;
-	    } 
-    }
-        
-    
-    read_f =0; // variável float
-    for (i = 1; i <= 6; i++)
-       {
-          HAL_ADC_Start(&hadc1);
-          HAL_ADC_PollForConversion(&hadc1,100);
-          read = HAL_ADC_GetValue(&hadc1);
-          read_f = (float)(read*3.3)/4095 +read_f;
-          vetv[i]=read_f;  // vetor tem que ser float também!
-       }
-    read_f = read_f/6;
-    read=(int)100*(read_f/3.3);
-    //HAL_Delay(1000);
+		read_pwm=((float)htim3.Instance->ARR)*((float)read/4095);
 
-    /* USER CODE END WHILE */
+		// filtro média móvel, para obter uma leitura mais precisa, e com menor variação
 
-    /* USER CODE BEGIN 3 */
-  }
-  /* USER CODE END 3 */
+		for (i = 0; i <= 5; i++)
+		{
+			HAL_ADC_Start(&hadc1);
+			HAL_ADC_PollForConversion(&hadc1,100);
+			read = HAL_ADC_GetValue(&hadc1);
+			read_f = (float)(read*3.3)/4095 +read_f;
+			vetv[i]=read_f;  // vetor tem que ser float também!
+		}
+		read_f = read_f/6;
+		//   read=(int)4095*(read_f/3.3);
+
+
+		switch(state)
+		{
+		case 0:
+		{
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12, GPIO_PIN_RESET);
+			/*enquanto não setar o flag start, a operação nao inicia*/
+			if(flag_start==1)
+				INICIALIZACAO();
+
+			break;
+		}
+		case 1:
+		{
+			/*a rampa de subida é controlada pela variavel j, que é o delay entre cada incremento
+	         da razão cíclica*/
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, 1);
+			RAMPA_SUBIDA();
+			break;
+		}
+		case 2:
+		{
+			/*aqui é operação em malha aberta, então é só ajustar a razão cíclica, neste caso
+	         a conversão do ADC é utilizada para mudar ela, ou seja, o potenciômetro ajusta seu valor*/
+
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, 1);
+			MALHA_ABERTA();
+
+			break;
+		}
+		case 3:
+		{
+			/*aqui é operação em malha fechada, o controlador vai sintetizar uma razão cíclica, e vai
+			 * compensar variação de carga também*/
+
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, 1);
+			MALHA_FECHADA();
+
+			break;
+		}
+		case 4:
+		{
+			/*aqui é o desligamento, vai ocorrer uma rampa de descida.*/
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, 1);
+			RAMPA_DESCIDA();
+			break;
+		}
+		case 5:
+		{
+			/*aqui significa que ocorreu uma falha, ou seja, o pwm é desabilitado imediatamente.*/
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12, 1);
+			PWM_TRIP();
+
+			break;
+		}
+		}
+
+
+
+
+	}
 }
+/* USER CODE END 3 */
 
 /* rotina de interrupção do módulo PWM, na borda de descida do pulso */
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim3)
 {
 
-  i++;
-  i--;
+	// operação em malha fechada
+	MALHA_FECHADA();
+
 
 }
 
@@ -133,51 +166,135 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim3)
    
 }
 
- void RAMPA_SUBIDA(void)
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin == GPIO_PIN_0) // If The INT Source Is EXTI Line9 (A9 Pin)
+	{
+		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13); // Toggle The Output (LED) Pin
+		state = 4;
 
- { 
-    for(i=0;i<100;i++)
-    {
-      htim3.Instance->CCR1 = (htim3.Instance->ARR*i)/100;
-      HAL_Delay(j);
-      flag_start=0;
-    }  
-    state = 2;
- }
+	}
+}
+void RAMPA_SUBIDA(void)
+{
+	for(i=0;i<100;i++)
+	{
+		htim3.Instance->CCR1 = (htim3.Instance->ARR*i)/100;
+		HAL_Delay(j);
+		flag_start=0;
+	}
+	state = 2;
+}
 
-  void RAMPA_DESCIDA(void)
- { 
-     for(i=100;i>0;i--)
-     {
-      htim3.Instance->CCR1 = (htim3.Instance->ARR*i)/100;
-      HAL_Delay(j);     
-     }
-     state = 0;
-     flag_start=0;
- }
+void RAMPA_DESCIDA(void)
+{
+	for(i=100;i>0;i--)
+	{
+		htim3.Instance->CCR1 = (htim3.Instance->ARR*i)/100;
+		HAL_Delay(j);
+	}
+	state = 0;
+	flag_start=0;
+}
 
-   void PWM_TRIP(void)
+void PWM_TRIP(void)
+{
+	htim3.Instance->CCR1 = 0;
+	state = 0;
+	flag_start=0;
+	flag_mf=0;
+}
 
- {
-   htim3.Instance->CCR1 = 0;
-   state = 0;
-   flag_start=0;
- }
+void MALHA_ABERTA(void)
+{
+	htim3.Instance->CCR1 = read_pwm;
+	if (flag_mf==1)
+		state=3;
 
-    void INICIALIZACAO(void)
+}
 
- {
-   read=0;
-   i=0;
-   j=200;
-   read_f=0;
-   for(i=0;i<6;i++)
-   {
-     vetv[i]=0;
-   }
-    htim3.Instance->CCR1 = (htim3.Instance->ARR*(0))/100;
-    state = 1;  
- }
+void MALHA_FECHADA(void)
+{
+	if(flag_mf==1)
+	{
+
+		// atualiza o valor do erro na execução anterior
+		//ek_1 = ek;
+
+		V_o = read*K_ad*K_filter;
+		e_k = v_ref-V_o;
+
+		// calculo acao proporcional
+		//u1=P*e_k;
+		/*
+	   	// Anti-windup da ação integral
+	   	if((u2>1)&(ek>0))
+	   	{
+	   		u2=u2;
+
+	   	}
+	   	else if ((u2<0)&(ek<0)){
+	   		u2=u2;
+
+	   	}
+
+	   	else
+	   	{
+	   		// calculo acao integral
+	   		u2 = I*ek+u2;
+	   	}
+
+	   	// calculo acao diferencial
+
+	   	u3 = (ek-ek_1)*D;
+
+	   	// soma das ações
+
+	   	u=u1+u2+u3;
+		 */
+		y_k = B2_k*e_k+B1_k*uk1+B0_k *uk2-A1_k*yk1-A0_k*yk2;
+
+		uk2=uk1;
+		uk1=e_k;
+
+		yk2=yk1;
+		yk1=y_k;
+
+		// Saturando a saída
+
+		if(y_k >=1)
+		{
+			y_k=0.98;
+
+		}
+
+		else if (y_k<=0)
+		{
+			y_k=0.02;
+		}
+
+		// Atualizando a razão cíclica
+
+		htim3.Instance->CCR1 = (htim3.Instance->ARR)*(1-y_k);
+
+	}
+
+}
+
+void INICIALIZACAO(void)
+
+{
+	read=0;
+	i=0;
+	j=200;
+	read_f=0;
+	for(i=0;i<6;i++)
+	{
+		vetv[i]=0;
+	}
+	htim3.Instance->CCR1 = (htim3.Instance->ARR*(0))/100;
+	state = 1;
+}
 
  /*Modulador PWM com quatro canais, dois complementares entre sí, utilizando o módulo avançado de temporizador*/
 
